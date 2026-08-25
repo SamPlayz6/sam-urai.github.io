@@ -32,33 +32,54 @@ export async function getQuadrants(): Promise<Record<QuadrantCategory, Quadrant>
     return await readJsonFile('quadrants.json')
   }
 
-  const prisma = await db()
-  const rows = await prisma.quadrant.findMany()
+  try {
+    const prisma = await db()
+    const rows = await prisma.quadrant.findMany()
 
-  const result = {} as Record<QuadrantCategory, Quadrant>
+    const defaultQuadrant = (cat: QuadrantCategory): Quadrant => ({
+      name: cat.charAt(0).toUpperCase() + cat.slice(1),
+      category: cat,
+      color: '',
+      status: 'needs_attention' as const,
+      lastActivity: new Date().toISOString(),
+      activityPulse: false,
+      recentEntries: [],
+      metrics: {},
+    })
 
-  for (const row of rows as AnyRecord[]) {
-    const category = row.category as QuadrantCategory
-    const extra = (row.extraData as Record<string, unknown>) || {}
-
-    result[category] = {
-      name: row.name,
-      category,
-      color: row.color,
-      status: row.status as Quadrant['status'],
-      lastActivity: row.lastActivity,
-      activityPulse: row.activityPulse,
-      recentEntries: (row.recentEntries as unknown as TimelineEntry[]) || [],
-      metrics: (row.metrics as Record<string, string | number>) || {},
-      people: row.people as unknown as Quadrant['people'],
-      skills: row.skills as unknown as Quadrant['skills'],
-      githubStats: row.githubStats as unknown as Quadrant['githubStats'],
-      travelStats: row.travelStats as unknown as Quadrant['travelStats'],
-      ...extra,
+    const result: Record<QuadrantCategory, Quadrant> = {
+      relationships: defaultQuadrant('relationships'),
+      parkour: defaultQuadrant('parkour'),
+      work: defaultQuadrant('work'),
+      travel: defaultQuadrant('travel'),
     }
-  }
 
-  return result
+    for (const row of rows as AnyRecord[]) {
+      const category = row.category as QuadrantCategory
+      const extra = (row.extraData as Record<string, unknown>) || {}
+
+      result[category] = {
+        name: row.name,
+        category,
+        color: row.color,
+        status: row.status as Quadrant['status'],
+        lastActivity: row.lastActivity,
+        activityPulse: row.activityPulse,
+        recentEntries: (row.recentEntries as unknown as TimelineEntry[]) || [],
+        metrics: (row.metrics as Record<string, string | number>) || {},
+        people: row.people as unknown as Quadrant['people'],
+        skills: row.skills as unknown as Quadrant['skills'],
+        githubStats: row.githubStats as unknown as Quadrant['githubStats'],
+        travelStats: row.travelStats as unknown as Quadrant['travelStats'],
+        ...extra,
+      }
+    }
+
+    return result
+  } catch (err) {
+    console.error('[data] getQuadrants DB read failed, using JSON fallback:', (err as Error).message)
+    return await readJsonFile('quadrants.json')
+  }
 }
 
 export async function getRightNow(): Promise<RightNow> {
@@ -66,42 +87,47 @@ export async function getRightNow(): Promise<RightNow> {
     return await readJsonFile('right_now.json')
   }
 
-  const prisma = await db()
-  const snapshot = await prisma.rightNowSnapshot.findFirst({
-    orderBy: { createdAt: 'desc' },
-  })
+  try {
+    const prisma = await db()
+    const snapshot = await prisma.rightNowSnapshot.findFirst({
+      orderBy: { createdAt: 'desc' },
+    })
 
-  if (!snapshot) {
-    return {
-      weekOf: new Date().toISOString().split('T')[0],
-      lastUpdated: new Date().toISOString(),
-      quadrantStatuses: {
-        relationships: 'needs_attention',
-        parkour: 'needs_attention',
-        work: 'needs_attention',
-        travel: 'needs_attention',
-      },
-      summary: 'No data yet. Run a processing cycle to populate.',
-      valuesAlignment: { score: 0, livingWell: [], needsAttention: [], note: '' },
-      actionables: [],
-      celebration: '',
-      friendlyNote: '',
+    if (!snapshot) {
+      return {
+        weekOf: new Date().toISOString().split('T')[0],
+        lastUpdated: new Date().toISOString(),
+        quadrantStatuses: {
+          relationships: 'needs_attention',
+          parkour: 'needs_attention',
+          work: 'needs_attention',
+          travel: 'needs_attention',
+        },
+        summary: 'No data yet. Run a processing cycle to populate.',
+        valuesAlignment: { score: 0, livingWell: [], needsAttention: [], note: '' },
+        actionables: [],
+        celebration: '',
+        friendlyNote: '',
+      }
     }
+
+    const extra = (snapshot.extraData as Record<string, unknown>) || {}
+
+    return {
+      weekOf: snapshot.weekOf,
+      lastUpdated: snapshot.lastUpdated,
+      quadrantStatuses: snapshot.quadrantStatuses as unknown as RightNow['quadrantStatuses'],
+      summary: snapshot.summary,
+      valuesAlignment: snapshot.valuesAlignment as unknown as RightNow['valuesAlignment'],
+      actionables: snapshot.actionables as unknown as RightNow['actionables'],
+      celebration: snapshot.celebration,
+      friendlyNote: snapshot.friendlyNote,
+      ...extra,
+    } as RightNow
+  } catch (err) {
+    console.error('[data] getRightNow DB read failed, using JSON fallback:', (err as Error).message)
+    return await readJsonFile('right_now.json')
   }
-
-  const extra = (snapshot.extraData as Record<string, unknown>) || {}
-
-  return {
-    weekOf: snapshot.weekOf,
-    lastUpdated: snapshot.lastUpdated,
-    quadrantStatuses: snapshot.quadrantStatuses as unknown as RightNow['quadrantStatuses'],
-    summary: snapshot.summary,
-    valuesAlignment: snapshot.valuesAlignment as unknown as RightNow['valuesAlignment'],
-    actionables: snapshot.actionables as unknown as RightNow['actionables'],
-    celebration: snapshot.celebration,
-    friendlyNote: snapshot.friendlyNote,
-    ...extra,
-  } as RightNow
 }
 
 export async function getTimeline(): Promise<TimelineEntry[]> {
@@ -109,21 +135,26 @@ export async function getTimeline(): Promise<TimelineEntry[]> {
     return await readJsonFile('timeline.json')
   }
 
-  const prisma = await db()
-  const entries = await prisma.timelineEntry.findMany({
-    orderBy: { date: 'desc' },
-  })
+  try {
+    const prisma = await db()
+    const entries = await prisma.timelineEntry.findMany({
+      orderBy: { date: 'desc' },
+    })
 
-  return entries.map((e: AnyRecord) => ({
-    id: e.id,
-    date: e.date,
-    category: e.category as QuadrantCategory,
-    title: e.title,
-    content: e.content,
-    imageUrl: e.imageUrl || undefined,
-    sourceNote: e.sourceNote || undefined,
-    significance: e.significance as TimelineEntry['significance'],
-  }))
+    return entries.map((e: AnyRecord) => ({
+      id: e.id,
+      date: e.date,
+      category: e.category as QuadrantCategory,
+      title: e.title,
+      content: e.content,
+      imageUrl: e.imageUrl || undefined,
+      sourceNote: e.sourceNote || undefined,
+      significance: e.significance as TimelineEntry['significance'],
+    }))
+  } catch (err) {
+    console.error('[data] getTimeline DB read failed, using JSON fallback:', (err as Error).message)
+    return await readJsonFile('timeline.json')
+  }
 }
 
 export async function getGoals(): Promise<Goals> {
@@ -131,39 +162,44 @@ export async function getGoals(): Promise<Goals> {
     return await readJsonFile('goals.json')
   }
 
-  const prisma = await db()
-  const goals = await prisma.goal.findMany({
-    orderBy: { createdAt: 'desc' },
-  })
+  try {
+    const prisma = await db()
+    const goals = await prisma.goal.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
 
-  const values = await prisma.value.findMany({
-    orderBy: { sortOrder: 'asc' },
-  })
+    const values = await prisma.value.findMany({
+      orderBy: { sortOrder: 'asc' },
+    })
 
-  return {
-    nearFuture: goals
-      .filter((g: AnyRecord) => g.timeframe === 'near')
-      .map((g: AnyRecord) => ({
-        id: g.id,
-        text: g.text,
-        category: (g.category as QuadrantCategory) || undefined,
-        completed: g.completed,
-        progress: g.progress || undefined,
-        createdAt: g.createdAt.toISOString().split('T')[0],
-        completedAt: g.completedAt?.toISOString().split('T')[0],
-      })),
-    farFuture: goals
-      .filter((g: AnyRecord) => g.timeframe === 'far')
-      .map((g: AnyRecord) => ({
-        id: g.id,
-        text: g.text,
-        category: (g.category as QuadrantCategory) || undefined,
-        completed: g.completed,
-        createdAt: g.createdAt.toISOString().split('T')[0],
-        completedAt: g.completedAt?.toISOString().split('T')[0],
-      })),
-    values: values.map((v: AnyRecord) => v.text),
-  } as Goals
+    return {
+      nearFuture: goals
+        .filter((g: AnyRecord) => g.timeframe === 'near')
+        .map((g: AnyRecord) => ({
+          id: g.id,
+          text: g.text,
+          category: (g.category as QuadrantCategory) || undefined,
+          completed: g.completed,
+          progress: g.progress || undefined,
+          createdAt: g.createdAt.toISOString().split('T')[0],
+          completedAt: g.completedAt?.toISOString().split('T')[0],
+        })),
+      farFuture: goals
+        .filter((g: AnyRecord) => g.timeframe === 'far')
+        .map((g: AnyRecord) => ({
+          id: g.id,
+          text: g.text,
+          category: (g.category as QuadrantCategory) || undefined,
+          completed: g.completed,
+          createdAt: g.createdAt.toISOString().split('T')[0],
+          completedAt: g.completedAt?.toISOString().split('T')[0],
+        })),
+      values: values.map((v: AnyRecord) => v.text),
+    } as Goals
+  } catch (err) {
+    console.error('[data] getGoals DB read failed, using JSON fallback:', (err as Error).message)
+    return await readJsonFile('goals.json')
+  }
 }
 
 export async function getInspiration(): Promise<InspirationItem[]> {
@@ -171,22 +207,27 @@ export async function getInspiration(): Promise<InspirationItem[]> {
     return await readJsonFile('inspiration.json')
   }
 
-  const prisma = await db()
-  const items = await prisma.inspirationItem.findMany({
-    orderBy: { createdAt: 'desc' },
-  })
+  try {
+    const prisma = await db()
+    const items = await prisma.inspirationItem.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
 
-  return items.map((i: AnyRecord) => ({
-    id: i.id,
-    category: i.category as InspirationItem['category'],
-    type: i.type as InspirationItem['type'],
-    title: i.title,
-    content: i.content,
-    source: i.source || undefined,
-    personName: i.personName || undefined,
-    addedAt: i.addedAt,
-    tags: (i.tags as string[]) || undefined,
-  }))
+    return items.map((i: AnyRecord) => ({
+      id: i.id,
+      category: i.category as InspirationItem['category'],
+      type: i.type as InspirationItem['type'],
+      title: i.title,
+      content: i.content,
+      source: i.source || undefined,
+      personName: i.personName || undefined,
+      addedAt: i.addedAt,
+      tags: (i.tags as string[]) || undefined,
+    }))
+  } catch (err) {
+    console.error('[data] getInspiration DB read failed, using JSON fallback:', (err as Error).message)
+    return await readJsonFile('inspiration.json')
+  }
 }
 
 export async function getMetadata(): Promise<Metadata> {
@@ -194,25 +235,30 @@ export async function getMetadata(): Promise<Metadata> {
     return await readJsonFile('metadata.json')
   }
 
-  const prisma = await db()
-  const meta = await prisma.processingMetadata.findUnique({
-    where: { id: 'singleton' },
-  })
+  try {
+    const prisma = await db()
+    const meta = await prisma.processingMetadata.findUnique({
+      where: { id: 'singleton' },
+    })
 
-  if (!meta) {
-    return {
-      lastProcessed: '',
-      lastNoteScanned: '',
-      totalEntriesProcessed: 0,
-      version: '1.0.0',
+    if (!meta) {
+      return {
+        lastProcessed: '',
+        lastNoteScanned: '',
+        totalEntriesProcessed: 0,
+        version: '1.0.0',
+      }
     }
-  }
 
-  return {
-    lastProcessed: meta.lastProcessed || '',
-    lastNoteScanned: meta.lastNoteScanned || '',
-    totalEntriesProcessed: meta.totalEntriesProcessed,
-    version: meta.version,
+    return {
+      lastProcessed: meta.lastProcessed || '',
+      lastNoteScanned: meta.lastNoteScanned || '',
+      totalEntriesProcessed: meta.totalEntriesProcessed,
+      version: meta.version,
+    }
+  } catch (err) {
+    console.error('[data] getMetadata DB read failed, using JSON fallback:', (err as Error).message)
+    return await readJsonFile('metadata.json')
   }
 }
 
