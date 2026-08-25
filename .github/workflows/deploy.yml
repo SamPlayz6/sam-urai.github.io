@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
+# RETIRED 2026-08-25: sdd.ie now serves the full app from Vercel (project sdd-ie),
+# including the dashboard/API that this Pages build strips out. Auto-deploy on push
+# is disabled to stop the two systems overlapping. Left as manual-only for reference.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
