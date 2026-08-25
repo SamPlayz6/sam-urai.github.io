@@ -1,16 +1,39 @@
 import type { Metadata } from 'next'
 import './globals.css'
 
+const siteTitle = 'Sam Dunning - AI & Full-Stack Developer'
+const siteDescription =
+  'AI and full-stack developer, and First Class Data Science graduate, building AI products end to end.'
+
 export const metadata: Metadata = {
-  title: 'Sam Dunning - AI & Full-Stack Developer',
-  description: 'AI and full-stack developer, and First Class Data Science graduate, building AI products end to end.',
+  metadataBase: new URL('https://sdd.ie'),
+  title: siteTitle,
+  description: siteDescription,
   icons: {
     icon: '/images/x-icon.png',
+    shortcut: '/images/x-icon.png',
+    apple: '/images/x-icon.png',
   },
   openGraph: {
-    title: 'Sam Dunning - AI & Full-Stack Developer',
-    description: 'AI and full-stack developer, and First Class Data Science graduate, building AI products end to end.',
+    title: siteTitle,
+    description: siteDescription,
+    url: 'https://sdd.ie',
+    siteName: 'Sam Dunning',
     type: 'website',
+    images: [
+      {
+        url: '/images/profile-pic.jpg',
+        width: 337,
+        height: 421,
+        alt: 'Sam Dunning',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteTitle,
+    description: siteDescription,
+    images: ['/images/profile-pic.jpg'],
   },
 }
 

@@ -52,7 +52,7 @@ export default function TopBar({ isDarkMode, onToggleDarkMode }: TopBarProps) {
 
       <div className="flex items-center flex-wrap gap-4">
         <a
-          href="https://docs.google.com/document/d/1pmmkSTg6Dd5jVZTDRGjASEfHsnTl6wDJ/edit?usp=sharing&ouid=102234148419806682305&rtpof=true&sd=true"
+          href="/cv.pdf"
           className="font-medium text-portfolio-text-light dark:text-portfolio-text-dark hover:text-portfolio-link-light dark:hover:text-portfolio-link-dark transition-colors"
           target="_blank"
           rel="noopener noreferrer"
